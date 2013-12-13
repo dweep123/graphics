@@ -1,0 +1,2 @@
+all:
+	g++ -g lastandscore.cpp robot.cpp imageloader.cpp text3d.cpp -lGL -lGLU -lglut -w

@@ -1,0 +1,1939 @@
+#include<iostream>
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include<time.h>
+#include<unistd.h>
+#include <GL/glut.h>
+#include<math.h>
+#include "imageloader.h"
+#include "robot.h"
+#include "text3d.h"
+#ifdef _WIN32
+#include "windows.h"
+#endif
+#define p 100
+#define q 100
+#define PI 3.14159265
+#define myh 0.4
+#define sp 0.5*myh
+#define scale 5 
+#define t_world 10
+#define x_world -5
+#define y_world -0.5
+#define z_world -5
+#define zlim 13.5
+#define xlim 13.5
+using namespace std;
+typedef float point[3];
+float jr=0.5;
+int score=0;
+int stopfl=0;
+int lives=3;
+int totramp=0;
+int varmove=0;
+int tramp_count=0;
+int mousex,mousey=10,mousez,helx,helz;
+float theta[6] = {0.0,0.0,0.0,0.0,0.0,0.0}, vel,vel1=0; /* initial joint angles */
+static GLint angle = 2;
+float height[4]={0,0,0,0};
+int done[4]={0,0,0,0}, firstPerson=0, tower=0, jump=0, base_i=-1, base_j=-1,tile=0, tile_i=9, tile_j=9, glow=0, thirdPerson=0, helicopter=0,spot_light=0,teleport=0, disp=0;
+float diff_heights[4]={4,5,3.7,2.7}, base;
+float rate[4]={0.43, 0.2, 0.5, 0.07};
+float winw,winh;
+int level_no=3;
+float beans[100][4];
+float rottheta=0.0;
+int step;
+void setTextureMatrix(void);
+void draw_star();
+void myinit();
+void update(int v);
+void drawworld();
+void drawcyl(float r, float h,float x, float y , float z);
+void drawsphere(float r,float x,float y , float z);
+void drawhemi(float R,float x,float y,float z);
+void drawCuboid(float l, float b, float h, int i, int j);
+void assignBlocks ( int i, int j, float x, float y, float z, int v, int s, float vel, int m1, int m2);
+void levels (int which);
+void drawwater();
+void texture();
+void mark();
+int check();
+void updateWorld();
+void drawblock(float l, float b, float h,int tele,int tramp,int fall);
+void handleKeypress1(unsigned char key, int x, int y);
+void handleKeypress2(int key, int x, int y);
+void exiting(int value)
+{
+	exit(0);
+}
+
+
+#ifdef _WIN32
+// As microsoft did not maintain openGL after version 1.1, Windows platform need to go throught this crap ; macosX and Linux are fine.
+// This block simply retries openGL function needed for this example.
+// I recommend to use GLEW instead of going this way. This is done this way only to ease beginner's compilation and portability
+
+
+PFNGLACTIVETEXTUREARBPROC glActiveTextureARB;
+
+// FrameBuffer (FBO) gen, bin and texturebind
+PFNGLGENFRAMEBUFFERSEXTPROC glGenFramebuffersEXT ;
+PFNGLBINDFRAMEBUFFEREXTPROC glBindFramebufferEXT ;
+PFNGLFRAMEBUFFERTEXTURE2DEXTPROC glFramebufferTexture2DEXT ;
+PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC glCheckFramebufferStatusEXT ;
+
+
+// Shader functions
+PFNGLCREATEPROGRAMOBJECTARBPROC  glCreateProgramObjectARB ;
+PFNGLUSEPROGRAMOBJECTARBPROC     glUseProgramObjectARB   ;
+PFNGLCREATESHADEROBJECTARBPROC   glCreateShaderObjectARB ;
+PFNGLSHADERSOURCEARBPROC         glShaderSourceARB        ;
+PFNGLCOMPILESHADERARBPROC        glCompileShaderARB       ;
+PFNGLGETOBJECTPARAMETERIVARBPROC glGetObjectParameterivARB;
+PFNGLATTACHOBJECTARBPROC         glAttachObjectARB        ;
+PFNGLLINKPROGRAMARBPROC          glLinkProgramARB         ;
+PFNGLGETUNIFORMLOCATIONARBPROC   glGetUniformLocationARB  ;
+PFNGLUNIFORM1IARBPROC            glUniform1iARB           ;
+PFNGLACTIVETEXTUREARBPROC		  glActiveTextureARB;
+PFNGLGETINFOLOGARBPROC           glGetInfoLogARB          ;
+
+void getOpenGLFunctionPointers(void)
+{
+	// FBO
+	glActiveTextureARB = (PFNGLACTIVETEXTUREARBPROC)wglGetProcAddress("glActiveTextureARB");
+	glGenFramebuffersEXT		= (PFNGLGENFRAMEBUFFERSEXTPROC)		wglGetProcAddress("glGenFramebuffersEXT");
+	glBindFramebufferEXT		= (PFNGLBINDFRAMEBUFFEREXTPROC)		wglGetProcAddress("glBindFramebufferEXT");
+	glFramebufferTexture2DEXT	= (PFNGLFRAMEBUFFERTEXTURE2DEXTPROC)wglGetProcAddress("glFramebufferTexture2DEXT");
+	glCheckFramebufferStatusEXT	= (PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC)wglGetProcAddress("glCheckFramebufferStatusEXT");
+	
+	//Shaders
+	glCreateProgramObjectARB = (PFNGLCREATEPROGRAMOBJECTARBPROC)wglGetProcAddress("glCreateProgramObjectARB");
+	glUseProgramObjectARB = (PFNGLUSEPROGRAMOBJECTARBPROC)wglGetProcAddress("glUseProgramObjectARB");
+	glCreateShaderObjectARB = (PFNGLCREATESHADEROBJECTARBPROC)wglGetProcAddress("glCreateShaderObjectARB");
+	glShaderSourceARB = (PFNGLSHADERSOURCEARBPROC)wglGetProcAddress("glShaderSourceARB"); 
+	glCompileShaderARB = (PFNGLCOMPILESHADERARBPROC)wglGetProcAddress("glCompileShaderARB"); 
+	glGetObjectParameterivARB = (PFNGLGETOBJECTPARAMETERIVARBPROC)wglGetProcAddress("glGetObjectParameterivARB"); 
+	glAttachObjectARB = (PFNGLATTACHOBJECTARBPROC)wglGetProcAddress("glAttachObjectARB"); 
+	glGetInfoLogARB = (PFNGLGETINFOLOGARBPROC)wglGetProcAddress("glGetInfoLogARB");
+	glLinkProgramARB = (PFNGLLINKPROGRAMARBPROC)wglGetProcAddress("glLinkProgramARB");
+	glGetUniformLocationARB = (PFNGLGETUNIFORMLOCATIONARBPROC)wglGetProcAddress("glGetUniformLocationARB");
+	glUniform1iARB = (PFNGLUNIFORM1IARBPROC)wglGetProcAddress("glUniform1iARB");
+	
+}
+#endif
+
+// Expressed as float so gluPerspective division returns a float and not 0 (640/480 != 640.0/480.0).
+#define RENDER_WIDTH 640.0
+#define RENDER_HEIGHT 480.0
+#define SHADOW_MAP_RATIO 2
+
+
+//Camera position
+float p_camera[3] = {32,20,0};
+
+//Camera lookAt
+float l_camera[3] = {2,0,-10};
+
+//Light position
+float p_light[3] = {3,20,0};
+
+//Light lookAt
+float l_light[3] = {0,0,-5};
+
+
+//Light mouvement circle radius
+float light_mvnt = 30.0f;
+
+// Hold id of the framebuffer for light POV rendering
+GLuint fboId;
+
+// Z values will be rendered to this texture when using fboId framebuffer
+GLuint depthTextureId;
+
+// Use to activate/disable shadowShader
+GLhandleARB shadowShaderId;
+GLuint shadowMapUniform;
+
+
+// Loading shader function
+GLhandleARB loadShader(char* filename, unsigned int type)
+{
+	FILE *pfile;
+	GLhandleARB handle;
+	const GLcharARB* files[1];
+	
+	// shader Compilation variable
+	GLint result;				// Compilation code result
+	GLint errorLoglength ;
+	char* errorLogText;
+	GLsizei actualErrorLogLength;
+	
+	char buffer[400000];
+	memset(buffer,0,400000);
+	
+	// This will raise a warning on MS compiler
+	pfile = fopen(filename, "rb");
+	if(!pfile)
+	{
+		printf("Sorry, can't open file: '%s'.\n", filename);
+		exit(0);
+	}
+	
+	fread(buffer,sizeof(char),400000,pfile);
+	//printf("%s\n",buffer);
+	
+	
+	fclose(pfile);
+	
+	handle = glCreateShaderObjectARB(type);
+	if (!handle)
+	{
+		//We have failed creating the vertex shader object.
+		printf("Failed creating vertex shader object from file: %s.",filename);
+		exit(0);
+	}
+	
+	files[0] = (const GLcharARB*)buffer;
+	glShaderSourceARB(
+					  handle, //The handle to our shader
+					  1, //The number of files.
+					  files, //An array of const char * data, which represents the source code of theshaders
+					  NULL);
+	
+	glCompileShaderARB(handle);
+	
+	//Compilation checking.
+	glGetObjectParameterivARB(handle, GL_OBJECT_COMPILE_STATUS_ARB, &result);
+	
+	// If an error was detected.
+	if (!result)
+	{
+		//We failed to compile.
+		printf("Shader '%s' failed compilation.\n",filename);
+		
+		//Attempt to get the length of our error log.
+		glGetObjectParameterivARB(handle, GL_OBJECT_INFO_LOG_LENGTH_ARB, &errorLoglength);
+		
+		//Create a buffer to read compilation error message
+		errorLogText = malloc(sizeof(char) * errorLoglength);
+		
+		//Used to get the final length of the log.
+		glGetInfoLogARB(handle, errorLoglength, &actualErrorLogLength, errorLogText);
+		
+		// Display errors.
+		printf("%s\n",errorLogText);
+		
+		// Free the buffer malloced earlier
+		free(errorLogText);
+	}
+	
+	return handle;
+}
+
+void loadShadowShader()
+{
+	GLhandleARB vertexShaderHandle;
+	GLhandleARB fragmentShaderHandle;
+	
+	vertexShaderHandle   = loadShader("VertexShader.c",GL_VERTEX_SHADER);
+	fragmentShaderHandle = loadShader("FragmentShader.c",GL_FRAGMENT_SHADER);
+	
+	shadowShaderId = glCreateProgramObjectARB();
+	
+	glAttachObjectARB(shadowShaderId,vertexShaderHandle);
+	glAttachObjectARB(shadowShaderId,fragmentShaderHandle);
+	glLinkProgramARB(shadowShaderId);
+	
+	shadowMapUniform = glGetUniformLocationARB(shadowShaderId,"ShadowMap");
+}
+
+void generateShadowFBO()
+{
+	int shadowMapWidth = RENDER_WIDTH * SHADOW_MAP_RATIO;
+	int shadowMapHeight = RENDER_HEIGHT * SHADOW_MAP_RATIO;
+	
+	//GLfloat borderColor[4] = {0,0,0,0};
+	
+	GLenum FBOstatus;
+	
+	// Try to use a texture depth component
+	glGenTextures(1, &depthTextureId);
+	glBindTexture(GL_TEXTURE_2D, depthTextureId);
+	
+	// GL_LINEAR does not make sense for depth texture. However, next tutorial shows usage of GL_LINEAR and PCF
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	
+	// Remove artefact on the edges of the shadowmap
+	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
+	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
+	
+	//glTexParameterfv( GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor );
+	
+	
+	
+	// No need to force GL_DEPTH_COMPONENT24, drivers usually give you the max precision if available 
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, shadowMapWidth, shadowMapHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	
+	// create a framebuffer object
+	glGenFramebuffersEXT(1, &fboId);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fboId);
+	
+	// Instruct openGL that we won't bind a color texture with the currently binded FBO
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	
+	// attach the texture to FBO depth attachment point
+	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT,GL_TEXTURE_2D, depthTextureId, 0);
+	
+	// check FBO status
+	FBOstatus = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
+	if(FBOstatus != GL_FRAMEBUFFER_COMPLETE_EXT)
+		printf("GL_FRAMEBUFFER_COMPLETE_EXT failed, CANNOT use FBO\n");
+	
+	// switch back to window-system-provided framebuffer
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+}
+
+void setupMatrices(float position_x,float position_y,float position_z,float lookAt_x,float lookAt_y,float lookAt_z)
+{
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluPerspective(45,RENDER_WIDTH/RENDER_HEIGHT,10,40000);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	gluLookAt(position_x,position_y,position_z,lookAt_x,lookAt_y,lookAt_z,0,1,0);
+}
+
+
+
+GLUquadricObj *t, *h;
+	GLUquadricObj *disk ;// Create pointer for storage space for object
+
+		//example
+	GLUquadricObj *Cylinder; // Create pointer for our cylinder
+char buf[10];
+char life[10];
+
+double size=1.0;
+int timer=0, keyPress=0, moveup=0;
+float vely=0.0;
+int ntiles[10][10];
+int call=0;
+
+// for score
+float _angle = -30.0f;
+float _scale;
+const char* STRS[1] = {"palyer score"};
+float computeScale(const char* strs[1]) {
+	float maxWidth = 0;
+	float width = t3dDrawWidth(strs[0]);
+	if (width > maxWidth) {
+		maxWidth = width;
+	}   
+	return 2.6f / maxWidth;
+}
+
+static double yVal=1.0;
+int spot(double a, double b, double c, double d, double e, double f){
+
+
+	GLfloat light_position[] = { a,b,c, 1.0 };
+
+	GLfloat spotDir[] = { d,e,f };
+	glShadeModel (GL_SMOOTH);
+	glLightfv(GL_LIGHT2,GL_POSITION,light_position);
+	glLightf(GL_LIGHT2,GL_SPOT_CUTOFF,200.0);
+	glLightf(GL_LIGHT2,GL_SPOT_EXPONENT,27);
+	glLightfv(GL_LIGHT2,GL_SPOT_DIRECTION,spotDir);
+	glEnable(GL_COLOR_MATERIAL);
+	glEnable(GL_DEPTH_TEST);
+	return 0;
+
+}
+
+
+/*int spot(double a, double b, double c, double d, double e, double f){
+	GLfloat mat_specular[] = { 0.3, 1.0, 0.3, 1.0 };
+
+	GLfloat mat_shininess[] = { 50.0 };
+
+	GLfloat light_position[] = { a,b,c, 1.0 };
+
+	GLfloat spotDir[] = { d,e,f };
+
+	glClearColor (0.5, 0.5, 0.5, 0.0);
+
+	glShadeModel (GL_SMOOTH);
+
+	glLightfv(GL_LIGHT0,GL_SPECULAR,mat_specular);
+
+	glLightfv(GL_LIGHT0,GL_POSITION,light_position);
+
+	glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+
+	glMaterialfv(GL_FRONT, GL_SHININESS, mat_shininess);
+
+	// Definig spotlight attributes
+
+	glLightf(GL_LIGHT0,GL_SPOT_CUTOFF,10.0);
+
+	glLightf(GL_LIGHT0,GL_SPOT_EXPONENT,1);
+
+	glLightfv(GL_LIGHT0,GL_SPOT_DIRECTION,spotDir);
+
+	glEnable(GL_COLOR_MATERIAL);
+
+	glEnable(GL_DEPTH_TEST);
+
+	return 0;
+
+}*/
+
+GLuint _textureId[10]; //The id of the texture
+
+
+//remaining code
+
+GLuint loadTexture(Image* image) {
+	GLuint textureId;
+	glGenTextures(1, &textureId); //Make room for our texture
+	glBindTexture(GL_TEXTURE_2D, textureId); //Tell OpenGL which texture to edit
+	//Map the image to the texture
+	glTexImage2D(GL_TEXTURE_2D,                //Always GL_TEXTURE_2D
+			0,                            //0 for now
+			GL_RGB,                       //Format OpenGL uses for image
+			image->width, image->height,  //Width and height
+			0,                            //The border of the image
+			GL_RGB, //GL_RGB, because pixels are stored in RGB format
+			GL_UNSIGNED_BYTE, //GL_UNSIGNED_BYTE, because pixels are stored
+			//as unsigned numbers
+			image->pixels);               //The actual pixel data
+	return textureId; //Returns the id of the texture
+}
+void draw_jell(float x, float y,float z)
+{
+
+	Cylinder = gluNewQuadric(); // Create our new quadric object
+	disk = gluNewQuadric(); // Create our new quadric object
+	gluQuadricDrawStyle( Cylinder, GLU_FILL); //FILL also can be line(wire)
+	gluQuadricNormals( Cylinder, GLU_SMOOTH); // For if lighting is to be used.
+	gluQuadricNormals( disk, GLU_SMOOTH); // For if lighting is to be used.
+	gluQuadricOrientation( Cylinder,GLU_OUTSIDE);
+	gluQuadricTexture( Cylinder, GL_TRUE);// if you want to map a texture to it.
+	gluQuadricTexture( disk, GL_TRUE);// if you want to map a texture to it.
+	glPushMatrix();
+	glTranslatef(x,y,z);
+	glRotatef(-90,0,1,0);
+	glColor3f( 1.0,1, 1.0 ); 
+	glEnable(GL_TEXTURE_2D);
+	//	glBindTexture(GL_TEXTURE_2D, _textureId[2]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glEnable(GL_TEXTURE_GEN_S); //enable texture coordinate generation
+	glEnable(GL_TEXTURE_GEN_T);
+	glBindTexture(GL_TEXTURE_2D, _textureId[2]); 
+	glRotatef(rottheta,0,1,0);
+
+	gluCylinder( Cylinder,.5, .5, .2,20,20 );
+	glPushMatrix();
+	glTranslatef(0,0,.1);
+	gluDisk( disk,0,.5, 20,20);
+	glPopMatrix();
+	glPushMatrix();
+	glTranslatef(0,0,0);
+	gluDisk( disk,0,.5, 20,20);
+	glPopMatrix();
+
+	//gluSphere(h,jr,20,20);
+	glDisable(GL_TEXTURE_GEN_S); //enable texture coordinate generation
+	glDisable(GL_TEXTURE_GEN_T);
+	glDisable(GL_TEXTURE_2D);
+	glPopMatrix();
+
+
+}
+void drawcoins()
+{
+	for(int i=0;i<level_no*10;i++)
+	{
+		if(beans[i][3]==1)
+		draw_jell(beans[i][0],beans[i][1],beans[i][2]);
+	}
+}
+
+robot a=robot();
+//robot b=robot();
+
+class block
+{
+	public:
+	float block_x,block_y,block_z,l,b,h,velocity,x,y,z;
+	int visible;
+	int state;
+	int tele;
+	int tramp;
+	int tox,toz;
+	int fall;
+	int min, max;
+	float low, high;
+
+	block( )
+	{
+		l=1.0f*scale;
+		b=1.0f*scale;
+		h=1.0f*scale;
+	}
+};
+block blocks[10][10];
+void dis_score()
+{
+glPushMatrix();
+	glTranslatef(0.0f, 0.0f, -8.0f);
+
+	GLfloat ambientColor[] = {0.4f, 0.4f, 0.4f, 1.0f};
+	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambientColor);
+
+	GLfloat lightColor0[] = {0.6f, 0.6f, 0.6f, 1.0f};
+	GLfloat lightPos0[] = {-0.5f, 0.5f, 1.0f, 0.0f};
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightColor0);
+	glLightfv(GL_LIGHT0, GL_POSITION, lightPos0);
+	glScalef(_scale, _scale, _scale);
+	glColor3f(0.3f, 1.0f, 0.3f);
+	glPushMatrix();
+	glTranslatef(15,11,-5);
+	t3dDraw3D(STRS[0],0, 0, 0.2f);
+	glTranslatef(5,0,0);
+	t3dDraw3D(buf,0, 0, 0.2f);
+	glPopMatrix();
+	glPushMatrix();
+	glTranslatef(-18,11,-5);
+	t3dDraw3D("Lives",0, 0, 0.2f);
+	glTranslatef(5,0,0);
+	t3dDraw3D(life,0, 0, 0.2f);
+	glPopMatrix();
+	if(stopfl==1 ){
+		if(lives<0){
+			glPushMatrix();
+			glScalef(2,2,2);
+			glColor3f(1,0,0);
+			t3dDraw3D("GAME OVER",0, 0, 0.2f);
+			glPopMatrix();
+
+		}
+		else{
+			level_no++;
+			if(level_no >3){
+				stopfl=1;
+				glPushMatrix();
+				glScalef(2,2,2);
+				glColor3f(1,0,0);
+				t3dDraw3D("GAME OVER",0, 0, 0.2f);
+				glPopMatrix();
+			}
+			else{
+			glPushMatrix();
+			glScalef(2,2,2);
+			glColor3f(1,0,0);
+			t3dDraw3D("LEVEL CLEARED",0, 0, 0.2f);
+			glPopMatrix();
+			stopfl=0;
+			levels(level_no);
+			a.rob_x=-5*scale;
+			a.rob_y=-2;
+			a.rob_z=-5*scale;
+			timer=0;
+			}
+		}
+	}
+	glPopMatrix();
+}
+void setTextureMatrix(void)
+{
+	static double modelView[16];
+	static double projection[16];
+	
+	// This is matrix transform every coordinate x,y,z
+	// x = x* 0.5 + 0.5 
+	// y = y* 0.5 + 0.5 
+	// z = z* 0.5 + 0.5 
+	// Moving from unit cube [-1,1] to [0,1]  
+	const GLdouble bias[16] = {	
+		0.5, 0.0, 0.0, 0.0, 
+		0.0, 0.5, 0.0, 0.0,
+		0.0, 0.0, 0.5, 0.0,
+	0.5, 0.5, 0.5, 1.0};
+	
+	// Grab modelview and transformation matrices
+	glGetDoublev(GL_MODELVIEW_MATRIX, modelView);
+	glGetDoublev(GL_PROJECTION_MATRIX, projection);
+	
+	
+	glMatrixMode(GL_TEXTURE);
+	glActiveTextureARB(GL_TEXTURE7);
+	
+	glLoadIdentity();	
+	glLoadMatrixd(bias);
+	
+	// concatating all matrice into one.
+	glMultMatrixd (projection);
+	glMultMatrixd (modelView);
+	
+	// Go back to normal matrix mode
+	glMatrixMode(GL_MODELVIEW);
+}
+void views()
+{
+if(spot_light==1)
+	{
+		glClearColor (0.5, 0.5, 0.5, 0.0);
+		GLfloat mat_specular[] = { 0.3, 0.3, 1.0, 1.0 };
+		GLfloat mat_shininess[] = { 100.0 };
+		glShadeModel (GL_SMOOTH);
+		spot( a.rob_x,a.rob_y+5,a.rob_z,-.5,-1,-.5);
+		glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+		glMaterialfv(GL_FRONT, GL_SHININESS, mat_shininess);
+		glEnable(GL_LIGHTING);
+
+
+	}
+	if(spot_light==0)
+	{
+		glDisable(GL_LIGHTING);
+	}
+
+	if (firstPerson==1)
+	{
+		if (a.dir==0)
+			gluLookAt(a.rob_x, a.rob_y,a.rob_z+9, a.rob_x,0,a.rob_z+10, 0,1,0);
+		else if (a.dir==1)
+			gluLookAt(a.rob_x + 9, a.rob_y,a.rob_z, a.rob_x+10,0,a.rob_z, 0,1,0);
+		else if (a.dir==2)
+			gluLookAt(a.rob_x, a.rob_y,a.rob_z-9, a.rob_x,0,a.rob_z-10, 0,1,0);
+		else if (a.dir==3)
+			gluLookAt(a.rob_x-9, a.rob_y,a.rob_z, a.rob_x-10,0,a.rob_z, 0,1,0);
+	}
+	else if (tower ==1 )
+	{
+		gluLookAt(40,40,40,0,0,0,0,1,0);
+	}
+	else if (tile==1)
+	{
+		gluLookAt(blocks[tile_i][tile_j].x*0.5,blocks[tile_i][tile_j].y+2.0,blocks[tile_i][tile_j].z*0.5,0.0,0.0,0.0,0,1,0);
+	}
+	else if(thirdPerson==1)
+	{
+                    if (a.dir==0)
+                          gluLookAt(a.rob_x, a.rob_y,a.rob_z, a.rob_x,0,a.rob_z+10, 0,1,0);
+                   else if (a.dir==1)
+                       gluLookAt(a.rob_x , a.rob_y,a.rob_z, a.rob_x+10,0,a.rob_z, 0,1,0);
+                   else if (a.dir==2)
+                         gluLookAt(a.rob_x, a.rob_y,a.rob_z, a.rob_x,0,a.rob_z-10, 0,1,0);
+                    else if (a.dir==3)
+                             gluLookAt(a.rob_x, a.rob_y,a.rob_z, a.rob_x-10,0,a.rob_z, 0,1,0);
+    	}
+   	else if(helicopter==1)
+    	{
+                gluLookAt(helx*0.1, mousey, helz*0.1, a.rob_x, a.rob_y, a.rob_z, 0,1,0);
+	}
+	else
+	{
+		gluLookAt(0,8,12,0,0,0,0,1,0);
+	}
+}
+
+void display(void)
+{
+	//mark();
+	keyPress=0;
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glColor3f(0.0, 0.0, 0.0);
+
+	glPushMatrix();
+	glTranslatef(0.0,0.0,-15.0);
+	if ((int)(1000*vel)==0)
+	{
+		theta[5]=0;
+		theta[4]=0;
+		theta[2]=0;
+		theta[3]=0;
+	}
+	else
+	{
+		if(timer%4<2)
+		{
+			theta[4]=60;
+			theta[5]=0;
+			theta[3]=60;
+			theta[2]=0;
+		}
+		if(timer%4>2)
+		{
+			theta[5]=60;
+			theta[4]=0;
+			theta[2]=60;
+			theta[3]=0;
+		}
+	}
+
+
+	views();	
+
+	drawworld();
+	//draw_star();	
+	drawcoins();
+	a.drawrobo();
+	if(spot_light==1)
+	{
+		glPushMatrix();
+		printf("%d %d\n",a.block_i,a.block_j);
+		printf("%f %f %f\n",blocks[a.block_i][a.block_j].x,blocks[a.block_i][a.block_j].y,blocks[a.block_i][a.block_j].z);
+		glTranslatef(blocks[a.block_i][a.block_j].x,blocks[a.block_i][a.block_j].y+15,blocks[a.block_i][a.block_j].z);
+		glColor3f(1.0, 0.0, 0.0);
+		gluSphere(h,1.5,20,20);
+		glPopMatrix();
+		glShadeModel (GL_SMOOTH);
+		GLfloat ambient[]= {0.2, 0.2, 0.3};
+		glLightfv( GL_LIGHT2, GL_AMBIENT, ambient);
+		GLfloat diffuse[]= {0, 0, 0};
+		glLightfv( GL_LIGHT2, GL_DIFFUSE, diffuse);
+
+		GLfloat specular[]= {0,0,0};
+		glLightfv(GL_LIGHT2, GL_SPECULAR, specular);
+		spot(blocks[a.block_i][a.block_j].x,blocks[a.block_i][a.block_j].y+15,blocks[a.block_i][a.block_j].z, 0,1,0);
+		glEnable(GL_LIGHTING);
+	}
+
+	if(spot_light==0)
+	{
+		glDisable(GL_LIGHTING);
+	}
+
+	glPopMatrix();
+	dis_score();
+	glFlush();
+	glutSwapBuffers();
+}
+
+
+
+void mouse(int btn, int state, int x, int z)
+{
+if(btn==GLUT_LEFT_BUTTON)
+	{
+  mousex=x;
+  mousez=z;
+        
+	}
+
+    if(btn == '3'){
+        mousey--;
+    }
+    if(btn=='4'){
+        mousey++;
+    }
+}
+void mouse1( int x1, int z1)
+{
+    helx=x1-mousex;
+    helz=z1-mousez;
+}
+void menu(int id)
+{
+	if(id <11 ) angle=id;
+	if(id ==11 ) exit(0);
+}
+
+	void
+myReshape(int w, int h)
+{
+	glViewport(0, 0, w, h);
+	winw=w;
+    	winh=h;
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluPerspective(45.0f,(float)w/(float)h,0.1f,200.0f);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+}
+void make_beans()
+{
+	for(int i=0;i<level_no*10;i++)
+	{
+		int x=rand()%6;
+		int z=rand()%6;
+		int negx=rand()%2;
+		int negz=rand()%2;
+		beans[i][0]=1.0*x*scale;
+		if(negx==1)
+		beans[i][0]=-1.0*x*scale;
+		beans[i][1]=4.0;
+		beans[i][2]=1.0*z*scale;
+		if(negz==1)
+		beans[i][2]=-1.0*z*scale;
+		beans[i][3]=1;
+	}
+}
+
+
+int  main(int argc, char **argv)
+{
+//	ISoundEngine* engine = createIrrKlangDevice();
+//	engine->play2D("super.mp3", true);
+//PlaySound("hailking.wav", NULL, SND_ASYNC|SND_FILENAME|SND_LOOP);
+strcpy(buf,"0");
+strcpy(life,"3");
+#ifdef _WIN32
+	getOpenGLFunctionPointers();
+#endif
+	keyPress=0;
+	levels(level_no);
+	make_beans();
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+	glutInitWindowSize(500, 500);
+	glutCreateWindow("robot");
+	myinit();
+	  _scale = computeScale(STRS);
+
+generateShadowFBO();
+	loadShadowShader();
+	
+	// This is important, if not here, FBO's depthbuffer won't be populated.
+	glEnable(GL_DEPTH_TEST);
+	glClearColor(0,0,0,1.0f);
+	
+	glEnable(GL_CULL_FACE);
+	
+	glHint(GL_PERSPECTIVE_CORRECTION_HINT,GL_NICEST);
+
+	glutDisplayFunc(display);
+	glutIdleFunc(display);
+	glutMouseFunc(mouse);
+	glutMotionFunc(mouse1);
+    	glutKeyboardFunc(handleKeypress1);
+	glutSpecialFunc(handleKeypress2);
+	glutReshapeFunc(myReshape);
+	glutTimerFunc(1,update , 100);
+	glutMainLoop();
+	return 0;
+}
+void myinit()
+{
+	glShadeModel(GL_SMOOTH);
+	glEnable(GL_LIGHT0);
+	glDepthFunc(GL_LEQUAL);
+	glEnable(GL_DEPTH_TEST);
+	t3dInit();
+	h=gluNewQuadric();
+	gluQuadricDrawStyle(h, GLU_FILL);
+	t=gluNewQuadric();
+	gluQuadricDrawStyle(t, GLU_FILL);
+  //      _model = MD2Model::load("Marvin.md2");
+//	_model->setAnimation("run");
+	//_model->setAnimation("jump");
+	Image* image = loadBMP("wooden.bmp");
+	_textureId[0] = loadTexture(image);
+	delete image;
+	Image* image1 = loadBMP("lower1.bmp");
+	_textureId[1] = loadTexture(image1);
+	delete image1;
+	Image* image2 = loadBMP("jelly.bmp");
+	_textureId[2] = loadTexture(image2);
+	delete image2;
+	Image* image3 = loadBMP("tramp.bmp");
+	_textureId[3] = loadTexture(image3);
+	delete image3;
+	Image* image4 = loadBMP("back.bmp");
+	_textureId[4] = loadTexture(image4);
+	delete image4;
+	Image* image5 = loadBMP("door.bmp");
+	_textureId[5] = loadTexture(image5);
+	delete image5;
+	Image* image6 = loadBMP("done.bmp");
+	_textureId[6] = loadTexture(image6);
+	delete image6;
+	Image* image7 = loadBMP("tiles.bmp");
+	_textureId[7] = loadTexture(image7);
+	delete image7;
+	/*Image* image4 = loadBMP("m2.bmp");
+	_textureId[4] = loadTexture(image4);
+	delete image4;
+	Image* image4 = loadBMP("m3.bmp");
+	_textureId[4] = loadTexture(image4);
+	delete image4;
+	Image* image4 = loadBMP("m4.bmp");
+	_textureId[4] = loadTexture(image4);
+	delete image4;
+	Image* image4 = loadBMP("5.bmp");
+	_textureId[4] = loadTexture(image4);
+	delete image4;
+	Image* image4 = loadBMP("m6.bmp");
+	_textureId[4] = loadTexture(image4);
+	delete image4;*/
+}
+void renderScene(void) 
+{
+	update(0);
+	
+	//First step: Render from the light POV to a FBO, story depth values only
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,fboId);	//Rendering offscreen
+	
+	//Using the fixed pipeline to render to the depthbuffer
+	glUseProgramObjectARB(0);
+	
+	// In the case we render the shadowmap to a higher resolution, the viewport must be modified accordingly.
+	glViewport(0,0,RENDER_WIDTH * SHADOW_MAP_RATIO,RENDER_HEIGHT* SHADOW_MAP_RATIO);
+	
+	// Clear previous frame values
+	glClear( GL_DEPTH_BUFFER_BIT);
+	
+	//Disable color rendering, we only want to write to the Z-Buffer
+	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE); 
+	
+	setupMatrices(p_light[0],p_light[1],p_light[2],l_light[0],l_light[1],l_light[2]);
+	
+	// Culling switching, rendering only backface, this is done to avoid self-shadowing
+	glCullFace(GL_FRONT);
+	//drawObjects();
+	
+	//Save modelview/projection matrice into texture7, also add a biais
+	setTextureMatrix();
+	
+	
+	// Now rendering from the camera POV, using the FBO to generate shadows
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,0);
+	
+	glViewport(0,0,RENDER_WIDTH,RENDER_HEIGHT);
+	
+	//Enabling color write (previously disabled for light POV z-buffer rendering)
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); 
+	
+	// Clear previous frame values
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	//Using the shadow shader
+	glUseProgramObjectARB(shadowShaderId);
+	glUniform1iARB(shadowMapUniform,7);
+	glActiveTextureARB(GL_TEXTURE7);
+	glBindTexture(GL_TEXTURE_2D,depthTextureId);
+	
+	
+	
+		
+
+	
+	setupMatrices(p_camera[0],p_camera[1],p_camera[2],l_camera[0],l_camera[1],l_camera[2]);
+	
+	glCullFace(GL_BACK);
+	//drawObjects();
+	
+	// DEBUG only. this piece of code draw the depth buffer onscreen
+	/*
+	 glUseProgramObjectARB(0);
+	 glMatrixMode(GL_PROJECTION);
+	 glLoadIdentity();
+	 glOrtho(-RENDER_WIDTH/2,RENDER_WIDTH/2,-RENDER_HEIGHT/2,RENDER_HEIGHT/2,1,20);
+	 glMatrixMode(GL_MODELVIEW);
+	 glLoadIdentity();
+	 glColor4f(1,1,1,1);
+	 glActiveTextureARB(GL_TEXTURE0);
+	 glBindTexture(GL_TEXTURE_2D,depthTextureId);
+	 glEnable(GL_TEXTURE_2D);
+	 glTranslated(0,0,-1);
+	 glBegin(GL_QUADS);
+	 glTexCoord2d(0,0);glVertex3f(0,0,0);
+	 glTexCoord2d(1,0);glVertex3f(RENDER_WIDTH/2,0,0);
+	 glTexCoord2d(1,1);glVertex3f(RENDER_WIDTH/2,RENDER_HEIGHT/2,0);
+	 glTexCoord2d(0,1);glVertex3f(0,RENDER_HEIGHT/2,0);
+	 
+	 
+	 glEnd();
+	 glDisable(GL_TEXTURE_2D);
+	 */
+	
+	glutSwapBuffers();
+}
+
+void score_update()
+{
+	for(int k=0;k<level_no*10;k++)
+	{
+		if(beans[k][3]==1 && abs(a.rob_x-beans[k][0])<=2 && abs(a.rob_y-beans[k][1])<=2 && abs(a.rob_z-beans[k][2])<=2)
+		{
+			score=score+10;
+			beans[k][3]=0;
+		sprintf(buf,"%d",score);
+			break;
+		}
+
+	}
+}
+int last_fall=0;
+int last_i;
+int last_j;
+void check_falling()
+{
+if(last_fall==0 && blocks[a.block_i][a.block_j].fall==1)
+	{
+		last_fall=timer;
+		last_i=a.block_i;
+		last_j=a.block_j;
+
+	}
+	printf("%d %d  last",last_fall,timer);
+	
+	if(last_fall!=0 && timer-last_fall>=30 && timer-last_fall<=60)
+	{
+		printf("entered");
+		blocks[last_i][last_j].y-=0.5;
+	}
+}
+void bouncing()
+{
+	if(a.rob_y<=blocks[a.block_i][a.block_j].y+2)
+	{
+		a.dir=(a.dir+2)%4;
+		if(a.dir==0)
+			a.rob_z+=0.3;
+		if(a.dir==1)
+			a.rob_x+=0.3;
+		if(a.dir==2)
+			a.rob_z-=0.3;
+		if(a.dir==3)
+			a.rob_x-=0.3;
+	}
+}
+
+
+// During translation, we also have to maintain the GL_TEXTURE8, used in the shadow shader
+// to determine if a vertex is in the shadow.
+void startTranslate(float x,float y,float z)
+{
+	glPushMatrix();
+	glTranslatef(x,y,z);
+	
+	glMatrixMode(GL_TEXTURE);
+	glActiveTextureARB(GL_TEXTURE7);
+	glPushMatrix();
+	glTranslatef(x,y,z);
+}
+
+void endTranslate()
+{
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
+	glPopMatrix();
+}
+
+void update(int v)
+{
+        p_light[0] = light_mvnt * cos(glutGet(GLUT_ELAPSED_TIME)/1000.0);
+	p_light[2] = light_mvnt * sin(glutGet(GLUT_ELAPSED_TIME)/1000.0);
+	
+	if(stopfl==1){
+		return ;
+	}
+	int i,j,flag1=0,flag=0;
+		if (a.dir==0)
+			a.rob_z+=vel+vel1;
+		else if (a.dir==1)
+			a.rob_x+=vel+vel1;
+		else if (a.dir==2)
+			a.rob_z-=vel+vel1;
+		else if (a.dir==3)
+			a.rob_x-=vel+vel1;
+
+	float x,y,z;
+	x=a.rob_x;
+	y=a.rob_y;
+	z=a.rob_z;
+	disp=0;
+	timer=timer+1;
+	rottheta=rottheta+7;
+	updateWorld();
+	for (i=0;i<10;i++)
+	{
+		for(j=0;j<10;j++)
+		{
+			if(a.rob_x>blocks[i][j].x-blocks[i][j].l/2 && a.rob_x<=blocks[i][j].x+blocks[i][j].l/2 && a.rob_z>blocks[i][j].z-blocks[i][j].b/2 && a.rob_z<=blocks[i][j].z+blocks[i][j].b/2 && blocks[i][j].visible==1)
+			{
+				a.block_i=i;
+				a.block_j=j;
+				flag1=1;
+				break;
+			}
+		}
+		if (flag1==1)
+			break;
+	}
+	if(flag1==0){
+		a.block_i=-1;
+		a.block_j=-1;
+	}
+	score_update();
+	check_falling();
+	if(a.block_i==9 && a.block_j==9 || lives <=0){
+		stopfl=1;
+	}
+
+	if (a.block_i!=-1 && a.block_j!=-1)
+	{
+		bouncing();
+		if(jump==0 && totramp==0)
+		{
+		a.rob_y=blocks[a.block_i][a.block_j].y+blocks[a.block_i][a.block_j].h/2+1.5;
+		
+		if (blocks[a.block_i][a.block_j].state==1){
+			a.rob_x=blocks[a.block_i][a.block_j].x;
+		}
+		if (blocks[a.block_i][a.block_j].state==2){
+			a.rob_z=blocks[a.block_i][a.block_j].z;
+		}
+		}
+	}
+	else{
+			a.rob_y-=0.1;
+			if(jump==0)
+			{
+				if(lives==0)
+					stopfl=1;
+			//	glutTimerFunc(500,exiting,0);
+				lives=lives-1;
+		sprintf(life,"%d",lives);
+				a.rob_x=-5*scale;
+				a.rob_y=2;
+				a.rob_z=-5*scale;
+			}
+
+	}
+
+	if (vel>=0.1 && keyPress==0)
+	{
+		vel-=0.1;
+	}
+	
+	if (jump==1)
+	{
+		if (a.dir==0)
+			a.rob_z+=vel;
+		else if (a.dir==1)
+			a.rob_x+=vel;
+		else if (a.dir==2)
+			a.rob_z-=vel;
+		else if (a.dir==3)
+			a.rob_x-=vel;
+
+
+		if (moveup>=1 && moveup<20)
+		{
+			moveup++;
+			a.rob_y+=0.15;
+		}
+		if (moveup==20)
+		{
+			moveup=-1;
+		}
+		if (moveup<=-1 && moveup>=-20)
+		{
+			moveup--;
+			a.rob_y-=0.125;
+		}
+		if(moveup==-20)
+		{
+			jump=0;
+			if(flag1==0)
+			{
+				if(lives==0)
+					stopfl=1;
+				lives--;
+		sprintf(life,"%d",lives);
+				a.rob_x=-5*scale;
+				a.rob_y=2;
+				a.rob_z=-5*scale;
+			}
+			vel1=0;
+
+		}
+	}
+//_model->advance((1.0*vel)/10.0);
+if(blocks[a.block_i][a.block_j].tele==1 && teleport==1)
+	{
+		int h,g;
+		h=a.block_i;
+		g=a.block_j;
+		a.block_i=blocks[h][g].tox;
+		a.block_j=blocks[h][g].toz;
+		a.rob_x=blocks[a.block_i][a.block_j].x;
+		a.rob_z=blocks[a.block_i][a.block_j].z;
+		a.rob_y=blocks[a.block_i][a.block_j].y+scale;
+		teleport=0;
+	}
+if(totramp==1){
+		if (varmove>=1 && varmove<20+4*tramp_count)
+		{
+			varmove++;
+			a.rob_y+=0.25;
+		}
+		if (varmove==20+4*tramp_count)
+		{
+			varmove=-1;
+		}
+		if (varmove<=-1 && varmove>=-(20+4*tramp_count))
+		{
+			varmove--;
+			a.rob_y-=0.25;
+		}
+		if(varmove==-(20+4*tramp_count))
+		{
+			if(tramp_count<9){
+			tramp_count++;
+			}
+			vely=0.1;
+			varmove=1;
+//		a.rob_y=blocks[a.block_i][a.block_j].y+blocks[a.block_i][a.block_j].h/2+1.5;
+		}
+		printf("tramp=%d\n",tramp_count);
+}
+if(blocks[a.block_i][a.block_j].tramp==1){
+	if(totramp==0){
+	totramp=1;
+			vely=0.1;
+			varmove=1;
+			base=a.rob_y;
+			base_i=a.block_i;
+			base_j=a.block_j;
+	}
+}
+else{
+	tramp_count=0;
+	totramp=0;
+}
+disp=1;
+	printf("%d %d\n",a.block_i,a.block_j);
+	glutTimerFunc(1,update, 1);
+}
+void drawCuboid(float l, float b, float h, int i, int j)
+{
+
+	float ll=l/2;
+	float bb=b/2;
+	float hh=h/2;
+	float bs=1.5;	
+
+	
+	if(i==2 && j==3){
+		bs=-1.0*height[0];
+		//drawblock(l,b,h,ll,bb,hh,bs);
+	}	
+	if(i==5 && j==9){
+		bs=-1.0*height[1];
+		//drawblock(l,b,h,ll,bb,hh,bs);
+	}
+	if(i==8 && j==7){
+		bs=-1.0*height[2];
+		//drawblock(l,b,h,ll,bb,hh,bs);
+	}
+	if(i==6 && j==1){
+		bs=-1.0*height[3];
+		//drawblock(l,b,h,ll,bb,hh,bs);
+	}
+	
+	
+
+	bs=1.5;
+}
+void drawhemi(float R,float x,float y,float z)
+{
+    	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glTranslatef(x,y,z);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glColor3f(0.0, 1.0, 0.0);
+
+	for(int j = 0; j < q; j++)
+	{
+		glBegin(GL_TRIANGLE_STRIP);
+		for(int i = 0; i <= p; i++)
+		{
+			glVertex3f( R * cos( (float)(j+1)/q * PI/2.0 ) * cos( 2.0 * (float)i/p * PI ),
+					R * sin( (float)(j+1)/q * PI/2.0 ),
+					R * cos( (float)(j+1)/q * PI/2.0 ) * sin( 2.0 * (float)i/p * PI ) );
+			glVertex3f( R * cos( (float)j/q * PI/2.0 ) * cos( 2.0 * (float)i/p * PI ),
+					R * sin( (float)j/q * PI/2.0 ),
+					R * cos( (float)j/q * PI/2.0 ) * sin( 2.0 * (float)i/p * PI ) );         
+		}
+		glEnd();
+	}
+	glPopMatrix();
+	glColor3f(0.0, 1.0, 0.0);
+
+}
+void drawcyl(float r, float h,float x, float y , float z)
+{
+	glPushMatrix();
+	glTranslatef(x,y,z);
+	glRotatef(-90.0, 1.0, 0.0, 0.0);
+	gluCylinder(t,r,r,h,100,100);
+	glPopMatrix();
+}
+void drawsphere(float r,float x,float y , float z)
+{
+	glPushMatrix();
+	glTranslatef(x,y,z);
+	gluSphere(h,r,10,10);
+	glPopMatrix();
+}
+void drawworld()
+{
+	int i,j;
+	for (i=0; i<10; i++)
+	{
+		for (j=0; j<10; j++)
+		{
+			if (blocks[i][j].visible==1)
+			{
+			
+				glPushMatrix();
+				glTranslatef(blocks[i][j].x,blocks[i][j].y,blocks[i][j].z);
+				drawblock(blocks[i][j].l,blocks[i][j].b,blocks[i][j].h,blocks[i][j].tele,blocks[i][j].tramp,blocks[i][j].fall);
+				glPopMatrix();
+			}
+		}
+	}
+	drawwater();
+
+}
+void draw_star()
+{
+
+	glPushMatrix();
+	glTranslatef(5*scale,2,5*scale);
+	glBegin(GL_LINE_LOOP);
+	glColor3f(1.0,0.0,0.0);
+	glVertex3f(0.0,2,0.0);
+	glVertex3f(1,1,0.0);
+	glVertex3f(2,0.5,0.0);
+	glVertex3f(1,0.0,0.0);
+	glVertex3f(2,-1,0.0);
+	glVertex3f(0.0,0.0,0.0);
+	glColor3f(1.0,0.0,1.0);
+	glVertex3f(-2,-1,0.0);
+	glColor3f(0.0,1.0,1.0);
+	glVertex3f(-1,0.0,0.0);
+	glColor3f(0.0,0.0,1.0);
+	glVertex3f(-2,0.5,0.0);
+	glVertex3f(-1,1,0.0);
+	glEnd();
+	glPopMatrix();
+}
+void drawblock(float l, float b, float h,int tele,int tramp,int fall)
+{
+	glColor3f(0.0,0.0,0.0);
+	if(tramp==1)
+	glColor3f( 1.0, 1.0, 1.0 ); 
+	else if(tele==1)
+	glColor3f( 1.0, 1.0, 0.0 ); 
+	else if(fall==1)
+	glColor3f( 1.0, 0.0, 0.0 ); 
+	else if(tele==0)
+	glColor3f( 1.0, 1.0, 1.0 ); 
+
+
+	glEnable(GL_TEXTURE_2D);
+		if(tramp!=1 && level_no==1)
+		glBindTexture(GL_TEXTURE_2D, _textureId[0]);
+		else if(level_no==1){
+		glBindTexture(GL_TEXTURE_2D, _textureId[3]);
+		}
+		if(tramp!=1 && level_no==2){
+			//glColor3f(0,1,0.8);
+		glBindTexture(GL_TEXTURE_2D, _textureId[7]);
+		}
+		else if(level_no==2){
+		glBindTexture(GL_TEXTURE_2D, _textureId[3]);
+		}
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glBegin(GL_POLYGON);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f( -l/2 , -h/2, -b/2 );
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(  l/2, -h/2,  -b/2 );
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f( l/2, -h/2,  b/2 );
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f( -l/2, -h/2, b/2 );
+	glEnd();
+
+
+	glBegin(GL_POLYGON);
+	glVertex3f(-l/2, h/2, -b/2);
+	glVertex3f( -l/2, -h/2, -b/2 );
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f( l/2,  -h/2, -b/2 );
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f( l/2,  h/2, -b/2 );
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f( -l/2,  h/2, -b/2 );
+	glEnd();
+
+	glBegin(GL_POLYGON);
+
+	glNormal3f(0.0, 1.0f, 0.0f);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(-l/2, h/2, -b/2);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(  l/2, h/2,  -b/2 );
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f( l/2, h/2,  b/2 );
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f( -l/2, h/2, b/2 );
+
+	glEnd();
+
+//	if(glow==0)
+
+//	if(glow==0)
+
+
+	// Front face
+//	if(glow==0)
+	glBegin(GL_POLYGON);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(  -l/2, -h/2, b/2 );
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(  l/2,  -h/2, b/2 );
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f( l/2,  h/2, b/2 );
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f( -l/2, h/2, b/2 );
+	glEnd();
+
+	// Left face
+//	if(glow==0)
+	glBegin(GL_POLYGON);
+	//	glColor3f( 0.0, 1.0, 1.0 ); 
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f( -l/2, -h/2, -b/2 );
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f( -l/2,  -h/2,  b/2 );
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f( -l/2,  h/2, b/2 );
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f( -l/2, h/2, -b/2 );
+	glEnd();
+
+	// Right face
+//	if(glow==0)
+	glBegin(GL_POLYGON);
+	//	glColor3f( 1.0, 0.0, 1.0 ); 
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f( l/2, -h/2, -b/2 );
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f( l/2,  -h/2,  b/2 );
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f( l/2,  h/2, b/2 );
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f( l/2, h/2, -b/2 );
+	glEnd();
+		glDisable(GL_TEXTURE_2D);
+
+
+}
+void handleKeypress2(int key, int x, int y)
+{
+	keyPress=1;
+	//printf("%d\n",a.dir);
+	if (key== GLUT_KEY_UP)
+	{
+			if (vel==0.0)
+				vel=0.4;
+			else if(vel<0.8)
+				vel+=0.1;
+	}
+	else if (key== GLUT_KEY_DOWN)
+	{
+			if (vel>=0.2)
+				vel-=0.2;
+	}
+	else if (key== GLUT_KEY_RIGHT)
+	{
+		if (a.dir==0)
+			a.dir=3;
+		else
+			a.dir--;
+	}
+	else if (key== GLUT_KEY_LEFT)
+	{
+		if (a.dir==3)
+			a.dir=0;
+		else
+			a.dir++;
+	}
+}
+void handleKeypress1(unsigned char key, int x, int y)
+{
+	if (key=='j'/* && moveup==0*/)
+	{
+		if (jump==0)
+		{
+			jump=1;
+			vely=0.1;
+		        vel1=0.125;
+			moveup=1;
+			base=a.rob_y;
+			base_i=a.block_i;
+			base_j=a.block_j;
+		}
+	}
+	if (key== 'f' )
+	{
+		firstPerson=(firstPerson+1)%2;
+		tower=0;
+		tile=0;
+		thirdPerson=0;
+		helicopter=0;
+	}
+	if (key== 't' )
+	{
+		tower=(tower+1)%2;
+		firstPerson=0;
+		tile=0;
+		thirdPerson=0;
+		helicopter=0;
+	}
+	if (key == 'i')
+	{
+		tile=(tile+1)%2;
+		tower=0;
+		firstPerson=0;
+		thirdPerson=0;
+		helicopter=0;
+	}
+	if(key == 'b')
+	{
+	        thirdPerson=(thirdPerson+1)%2;   
+		tower=0;
+		firstPerson=0;
+		tile=0;
+		helicopter=0;
+    	}
+   	 if(key=='h')
+    	{
+        	 helicopter=(helicopter+1)%2;
+		tower=0;
+		firstPerson=0;
+		tile=0;
+		thirdPerson=0;
+    	}
+	if (tile==1)
+	{
+		if(key == 'a')
+		{
+			if (tile_j>0)
+				tile_j--;
+		}
+		if(key == 'd')
+		{
+			if (tile_j<9)
+				tile_j++;
+		}
+		if (key == 's')
+		{
+			if (tile_i<9)
+				tile_i++;
+		}
+		if (key == 'w')
+		{
+			if (tile_i>0)
+				tile_i--;
+		}
+	}
+	if(key=='s')
+	{
+		spot_light=(spot_light+1)%2;
+	}
+
+	if(key=='w')
+	{
+		teleport=(teleport+1)%2;
+	}
+	//printf("tile %d %d\n",tile_i,tile_j);
+}
+
+void levels (int which)
+{
+	float xdir,ydir,zdir;
+	float velocity=0.125,min=which,max=which;
+	for(int i=0;i<t_world;i++)
+	{
+		xdir=x_world;
+		ydir=y_world;
+		zdir=z_world;
+		int vis_arr[which*2];
+		
+
+		for (int j=0;j<which*2;j++)
+		{
+			vis_arr[j]=rand()%10;
+		}
+		for(int j=0;j<t_world;j++)
+		{
+			int visible=1;
+			assignBlocks(i,j,xdir+j,ydir,zdir+i,visible,0,0,0,0);
+		}
+	}
+	for(int i=0;i<t_world;i++)
+	{
+		xdir=x_world;
+		ydir=y_world;
+		zdir=z_world;
+		int state_arr[which*2];
+		int state1[t_world];
+         	for(int k=0;k<t_world;k++)
+		{
+			state1[k]=0;
+		}
+		for (int j=0;j<which*2;j++)
+		{
+			state_arr[j]=rand()%10;
+			state1[state_arr[j]]=rand()%3+1;
+		}
+		for(int j=0;j<t_world;j++)
+		{
+			int state=0;
+			for(int k=0;k<which*2;k++)
+			{
+				if(j==state_arr[k])
+				{
+					state=state1[state_arr[k]];
+					for(int m=-which;m<=which;m++)
+					{
+						if(state==1)
+						{
+							if(m!=0 && j+m>0 && j+m<t_world)
+							assignBlocks(i,j+m,xdir+j,ydir,zdir+i+m,0,blocks[i][j+m].state,0,0,0);
+						}
+						if(state==2)
+						{
+							if(m!=0 && i+m>0 && i+m<t_world)
+							assignBlocks(i+m,j,xdir+j+m,ydir,zdir+i,0,blocks[i+m][j].state,0,0,0);
+						}
+
+					}
+				}
+			}
+			//blocks[i][j].tramp=1;
+			assignBlocks(i,j,xdir+j,ydir,zdir+i,blocks[i][j].visible,state,velocity,min,max);
+		}
+	}
+	for(int i=0;i<level_no;i++)
+	{
+		int from_x;
+		int from_z;
+		int to_x;
+		int to_z;
+		while(1)
+		{
+			from_x=rand()%10;
+			from_z=rand()%10;
+			if(blocks[from_x][from_z].visible==1)
+			{
+				to_x=rand()%10;
+				to_z=rand()%10;
+				if(blocks[to_x][to_z].visible==1 && to_x!=from_x && to_x!=from_z)
+					break;
+			}
+		}
+		blocks[from_x][from_z].tele=1;
+		blocks[from_x][from_z].tox=to_x;
+		blocks[from_x][from_z].toz=to_z;
+		blocks[to_x][to_z].tele=1;
+		blocks[to_x][to_z].tox=from_x;
+		blocks[to_x][to_z].toz=from_z;
+
+	}
+	for(int i=0;i<level_no;i++)
+	{
+		int x,y;
+		while(1)
+		{
+			x=rand()%9+1;
+			y=rand()%10;
+			if(blocks[x][y].tele!=1 && blocks[x][y].visible==1 )
+			{
+				blocks[x][y].tramp=1;
+
+//				blocks[x][y].state=3;
+				break;
+			}
+		}
+	}
+	for(int i=0;i<level_no;i++)
+	{
+		int x,y;
+		while(1)
+		{
+			x=rand()%10;
+			y=rand()%10;
+			if(blocks[x][y].tele!=1 && blocks[x][y].visible==1 && blocks[x][y].tramp!=1)
+			{
+				blocks[x][y].fall=1;
+				break;
+			}
+		}
+	}
+	int i,j;
+	for (i=0;i<10;i++)
+	{
+		for (j=0;j<10;j++)
+		{
+			blocks[i][j].block_x*=scale;
+			blocks[i][j].block_y*=scale;
+			blocks[i][j].block_z*=scale;
+
+			blocks[i][j].x=blocks[i][j].block_x;
+			blocks[i][j].y=blocks[i][j].block_y;
+			blocks[i][j].z=blocks[i][j].block_z;
+			if (blocks[i][j].state==3)
+			{
+				blocks[i][j].low=blocks[i][j].block_y-blocks[i][j].min*blocks[i][j].h;
+				blocks[i][j].high=blocks[i][j].block_y+blocks[i][j].max*blocks[i][j].h;
+			}
+			else if (blocks[i][j].state==2)
+			{
+				blocks[i][j].low=blocks[i][j].block_z-blocks[i][j].min*blocks[i][j].h;
+				blocks[i][j].high=blocks[i][j].block_z+blocks[i][j].max*blocks[i][j].h;
+			}
+			else if (blocks[i][j].state==1)
+			{
+				blocks[i][j].low=blocks[i][j].block_x-blocks[i][j].min*blocks[i][j].h;
+				blocks[i][j].high=blocks[i][j].block_x+blocks[i][j].max*blocks[i][j].h;
+			}
+		}
+	}	
+}
+
+void assignBlocks ( int i, int j, float x, float y, float z, int v, int s, float vel, int m1, int m2)
+{
+	blocks[i][j].block_x=x;
+	blocks[i][j].block_y=y;
+	blocks[i][j].block_z=z;
+	blocks[i][j].visible=v;
+	blocks[i][j].state=s;
+	blocks[i][j].velocity=vel;
+	blocks[i][j].min=m1;
+	blocks[i][j].max=m2;
+}
+void updateWorld()
+{
+	int i,j;
+	for (i=0;i<10;i++)
+	{
+		for(j=0;j<10;j++)
+		{
+			if(blocks[i][j].state==3)
+			{
+				if( blocks[i][j].y<=blocks[i][j].low*1.2 || blocks[i][j].y>=blocks[i][j].high*1.2)
+				{
+					blocks[i][j].velocity*=-1;
+				}
+				blocks[i][j].y+=blocks[i][j].velocity;
+			}
+			if(blocks[i][j].state==2)
+			{
+				if( blocks[i][j].z==blocks[i][j].low || blocks[i][j].z==blocks[i][j].high)
+				{
+					blocks[i][j].velocity*=-1;
+				}
+				blocks[i][j].z+=blocks[i][j].velocity;
+			}
+			if(blocks[i][j].state==1)
+			{
+				if( blocks[i][j].x==blocks[i][j].low || blocks[i][j].x==blocks[i][j].high)
+				{
+					blocks[i][j].velocity*=-1;
+				}
+				blocks[i][j].x+=blocks[i][j].velocity;
+			}
+		}
+	}
+}
+void drawwater()
+{
+	glColor3f(1.0,1.0,1.0);
+	glEnable(GL_TEXTURE_2D);
+        float pass;
+	if(level_no==1)
+	{
+	glBindTexture(GL_TEXTURE_2D, _textureId[4]);
+	pass=100;
+	}
+	if(level_no==2)
+	{
+	glBindTexture(GL_TEXTURE_2D, _textureId[5]);
+	pass=50;
+	}
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBegin(GL_POLYGON);
+	glNormal3f(0.0, 1.0f, 0.0f);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(pass, -20, -pass);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f(pass, 70, -pass);
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f(-pass, 70, -pass);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(-pass, -20, -pass);
+
+	glEnd();
+glBegin(GL_POLYGON);
+
+	glNormal3f(0.0, 1.0f, 0.0f);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(pass, -20, pass);
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f(pass, 70, pass);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f(-pass, 70, pass);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(-pass, -20, pass);
+
+	glEnd();
+
+glBegin(GL_POLYGON);
+
+	glNormal3f(0.0, 1.0f, 0.0f);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(-pass, -20, -pass);
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f(-pass, 70, -pass);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f(-pass, 70, pass);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(-pass, -20, pass);
+
+	glEnd();
+glBegin(GL_POLYGON);
+
+	glNormal3f(0.0, 1.0f, 0.0f);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(pass, -20, -pass);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f(pass, 70, -pass);
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f(pass, 70, pass);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(pass, -20, pass);
+
+	glEnd();
+
+
+	glColor3f(1.0,1.0,1.0);
+glDisable(GL_TEXTURE_2D);
+	glEnable(GL_TEXTURE_2D);
+	if(level_no==1)
+	glBindTexture(GL_TEXTURE_2D, _textureId[1]);
+	if(level_no==2)
+	{
+		glColor3f(0.0,0.0,0.0);
+	glBindTexture(GL_TEXTURE_2D, _textureId[6]);
+	}
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBegin(GL_POLYGON);
+
+	glNormal3f(0.0, 1.0f, 0.0f);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(-pass, -20, pass);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(pass, -20, pass);
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f(pass, -20, -pass);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f(-pass,-20, -pass);
+
+	glEnd();
+
+
+glDisable(GL_TEXTURE_2D);
+
+}
+void texture()
+{
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	glTranslatef(0.0f, 1.0f, -6.0f);
+
+	GLfloat ambientLight[] = {0.2f, 0.2f, 0.2f, 1.0f};
+	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambientLight);
+
+	GLfloat directedLight[] = {0.7f, 0.7f, 0.7f, 1.0f};
+	GLfloat directedLightPos[] = {-10.0f, 15.0f, 20.0f, 0.0f};
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, directedLight);
+	glLightfv(GL_LIGHT0, GL_POSITION, directedLightPos);
+
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, _textureId[0]);
+	//printf("this is id ->%d\n",_textureId);
+
+	//Bottom
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glColor3f(1.0f, 0.2f, 0.2f);
+	glBegin(GL_QUADS);
+
+	glNormal3f(0.0, 1.0f, 0.0f);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(-2.5f, -2.5f, 2.5f);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(2.5f, -2.5f, 2.5f);
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f(2.5f, -2.5f, -2.5f);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f(-2.5f, -2.5f, -2.5f);
+
+	glEnd();
+
+	//Back
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glColor3f(1.0f, 1.0f, 1.0f);
+	glBegin(GL_TRIANGLES);
+
+	glNormal3f(0.0f, 0.0f, 1.0f);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(-2.5f, -2.5f, -2.5f);
+	glTexCoord2f(5.0f, 5.0f);
+	glVertex3f(0.0f, 2.5f, -2.5f);
+	glTexCoord2f(10.0f, 0.0f);
+	glVertex3f(2.5f, -2.5f, -2.5f);
+
+	glEnd();
+
+	//Left
+	glDisable(GL_TEXTURE_2D);
+	glColor3f(1.0f, 0.7f, 0.3f);
+	glBegin(GL_QUADS);
+
+	glNormal3f(1.0f, 0.0f, 0.0f);
+	glVertex3f(-2.5f, -2.5f, 2.5f);
+	glVertex3f(-2.5f, -2.5f, -2.5f);
+	glVertex3f(-2.5f, 2.5f, -2.5f);
+	glVertex3f(-2.5f, 2.5f, 2.5f);
+
+	glEnd();
+
+	glutSwapBuffers();
+}

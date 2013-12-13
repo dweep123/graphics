@@ -1,0 +1,9 @@
+In this assignment we have tried to capture motion of an android using the the four arrow keys
+->  =>   	turns robot to its left
+<-  =>		turns it to right
+up  =>  	increases the speed
+j   =>          jumps the robot in parabolic motion if their is some horizontal speed given to the robot
+t   => 		toggles the view between tower and first person view(person person being the default view)
+Also there are two texture files which puts the texture on tile and the water
+Check function in the code currently checks if the current position of robot is safe or not 
+Missing_tiles enables random tiles to be invisible
